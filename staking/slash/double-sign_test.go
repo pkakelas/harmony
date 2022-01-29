@@ -505,7 +505,7 @@ func (tc *slashApplyTestCase) makeData() {
 }
 
 func (tc *slashApplyTestCase) apply() {
-	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.rate, tc.state, tc.reporter,
+	tc.gotErr = delegatorSlashApply(tc.snapshot, tc.current, tc.state, tc.reporter,
 		big.NewInt(doubleSignEpoch), tc.slashTrack)
 }
 
