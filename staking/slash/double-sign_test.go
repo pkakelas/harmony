@@ -894,16 +894,14 @@ func TestApply(t *testing.T) {
 			snapshot: defaultSnapValidatorWrapper(),
 			current:  defaultCurrentValidatorWrapper(),
 			slashes:  Records{defaultSlashRecord()},
-			rate:     numeric.NewDecWithPrec(625, 3),
 
-			expSlashed: twentyFiveKOnes,
-			expSnitch:  new(big.Int).Div(twentyFiveKOnes, common.Big2),
+			expSlashed: twentyKOnes,
+			expSnitch:  tenKOnes,
 		},
 		{
 			// missing snapshot in chain
 			current: defaultCurrentValidatorWrapper(),
 			slashes: Records{defaultSlashRecord()},
-			rate:    numeric.NewDecWithPrec(625, 3),
 
 			expErr: errors.New("could not find validator"),
 		},
@@ -911,7 +909,6 @@ func TestApply(t *testing.T) {
 			// missing vWrapper in state
 			snapshot: defaultSnapValidatorWrapper(),
 			slashes:  Records{defaultSlashRecord()},
-			rate:     numeric.NewDecWithPrec(625, 3),
 
 			expErr: errValidatorNotFoundDuringSlash,
 		},
@@ -930,7 +927,6 @@ func TestApply(t *testing.T) {
 type applyTestCase struct {
 	snapshot, current *staking.ValidatorWrapper
 	slashes           Records
-	rate              numeric.Dec
 
 	chain            *fakeBlockChain
 	state, stateSnap *state.DB
@@ -971,13 +967,13 @@ func (tc *applyTestCase) checkResult() error {
 	if (tc.gotErr != nil) || (tc.expErr != nil) {
 		return nil
 	}
-	if tc.gotDiff.TotalSnitchReward.Cmp(tc.expSnitch) != 0 {
-		return fmt.Errorf("unexpected snitch %v / %v", tc.gotDiff.TotalSnitchReward,
-			tc.expSnitch)
-	}
 	if tc.gotDiff.TotalSlashed.Cmp(tc.expSlashed) != 0 {
 		return fmt.Errorf("unexpected total slash %v / %v", tc.gotDiff.TotalSlashed,
 			tc.expSlashed)
+	}
+	if tc.gotDiff.TotalSnitchReward.Cmp(tc.expSnitch) != 0 {
+		return fmt.Errorf("unexpected snitch %v / %v", tc.gotDiff.TotalSnitchReward,
+			tc.expSnitch)
 	}
 	if err := tc.checkState(); err != nil {
 		return fmt.Errorf("state check: %v", err)
@@ -1000,7 +996,7 @@ func (tc *applyTestCase) checkState() error {
 	if err != nil {
 		return err
 	}
-	if tc.rate != numeric.ZeroDec() && reflect.DeepEqual(vwSnap.Delegations, vw.Delegations) {
+	if reflect.DeepEqual(vwSnap.Delegations, vw.Delegations) {
 		return fmt.Errorf("status still unchanged")
 	}
 	return nil
@@ -1126,16 +1122,16 @@ func generateDelegations(delData []testDelegation) staking.Delegations {
 			delegations[i].Undelegations = append(
 				delegations[i].Undelegations,
 				staking.Undelegation{
-					Amount: del.historyUndel,
+					Amount: new(big.Int).Set(del.historyUndel),
 					Epoch:  big.NewInt(doubleSignEpoch - 1),
 				},
 			)
 		}
-		if del.historyUndel != nil {
+		if del.afterSignUndel != nil {
 			delegations[i].Undelegations = append(
 				delegations[i].Undelegations,
 				staking.Undelegation{
-					Amount: del.afterSignUndel,
+					Amount: new(big.Int).Set(del.afterSignUndel),
 					Epoch:  big.NewInt(doubleSignEpoch + 1),
 				},
 			)
