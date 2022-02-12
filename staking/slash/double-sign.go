@@ -1,7 +1,6 @@
 package slash
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
@@ -13,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	bls_core "github.com/harmony-one/bls/ffi/go/bls"
 	consensus_sig "github.com/harmony-one/harmony/consensus/signature"
-	"github.com/harmony-one/harmony/consensus/votepower"
 	"github.com/harmony-one/harmony/core/state"
 	"github.com/harmony-one/harmony/crypto/hash"
 	common2 "github.com/harmony-one/harmony/internal/common"
@@ -501,7 +499,7 @@ func applySlashing(snapshot, current *staking.ValidatorWrapper, state *state.DB,
 // Apply ..
 func Apply(
 	chain staking.ValidatorSnapshotReader, state *state.DB,
-	slashes Records, rate numeric.Dec,
+	slashes Records,
 ) (*Application, error) {
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for _, slash := range slashes {
@@ -550,40 +548,4 @@ func Apply(
 // IsBanned ..
 func IsBanned(wrapper *staking.ValidatorWrapper) bool {
 	return wrapper.Status == effective.Banned
-}
-
-// Rate is the slashing % rate
-func Rate(votingPower *votepower.Roster, records Records) numeric.Dec {
-	rate := numeric.ZeroDec()
-
-	for i := range records {
-		doubleSignKeys := []bls.SerializedPublicKey{}
-		for _, pubKey1 := range records[i].Evidence.FirstVote.SignerPubKeys {
-			for _, pubKey2 := range records[i].Evidence.SecondVote.SignerPubKeys {
-				if shard.CompareBLSPublicKey(pubKey1, pubKey2) == 0 {
-					doubleSignKeys = append(doubleSignKeys, pubKey1)
-					break
-				}
-			}
-		}
-
-		for _, key := range doubleSignKeys {
-			if card, exists := votingPower.Voters[key]; exists &&
-				bytes.Equal(card.EarningAccount[:], records[i].Evidence.Offender[:]) {
-				rate = rate.Add(card.GroupPercent)
-			} else {
-				utils.Logger().Debug().
-					RawJSON("roster", []byte(votingPower.String())).
-					RawJSON("double-sign-record", []byte(records[i].String())).
-					Msg("did not have offenders voter card in roster as expected")
-			}
-		}
-
-	}
-
-	if rate.LT(oneDoubleSignerRate) {
-		rate = oneDoubleSignerRate
-	}
-
-	return rate
 }
