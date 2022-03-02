@@ -360,6 +360,9 @@ func payDownAsMuchAsCan(
 	return nil
 }
 
+// delegatorSlashApply applies slashing to all delegators including the validator.
+// The validator’s self-owned stake is slashed by 50%.
+// The stake of external delegators is slashed by 80% of the leader’s self-owned slashed stake, each one proportionally to their stake.
 func delegatorSlashApply(
 	snapshot, current *staking.ValidatorWrapper,
 	state *state.DB,
@@ -367,28 +370,26 @@ func delegatorSlashApply(
 	doubleSignEpoch *big.Int,
 	slashTrack *Application,
 ) error {
-	// validator
-	// assert(snapshot.Validator.Address == snapshot.Delegations[0].DelegatorAddress)
+	// First delegation is validator's own stake
 	validatorDebt := new(big.Int).Div(snapshot.Delegations[0].Amount, common.Big2)
-	validatorSlashed, err := applySlashing(snapshot, current, state, reporter, doubleSignEpoch, slashTrack, validatorDebt, snapshot.Delegations[0])
+	validatorSlashed, err := applySlashingToDelegator(snapshot, current, state, reporter, doubleSignEpoch, slashTrack, validatorDebt, snapshot.Delegations[0])
 	if err != nil {
 		return err
 	}
 
+	// External delegators
 	totalExternalDelegation := big.NewInt(0)
 	for _, delegationSnapshot := range snapshot.Delegations[1:] {
 		totalExternalDelegation.Add(totalExternalDelegation, delegationSnapshot.Amount)
 	}
 
-	totalDebt := applySlashRate(validatorSlashed, numeric.MustNewDecFromStr("0.8")) // 40
+	totalDebt := applySlashRate(validatorSlashed, numeric.MustNewDecFromStr("0.8"))
 
-	// external delegators
 	for _, delegationSnapshot := range snapshot.Delegations[1:] {
-		// assert(validatorAddress != delegationSnapshot.ValidatorAddress)
-		totalDelegationDec := numeric.NewDecFromBigInt(totalExternalDelegation)                   // 200
-		percentage := numeric.NewDecFromBigInt(delegationSnapshot.Amount).Quo(totalDelegationDec) // 50
-		slashDebt := applySlashRate(totalDebt, percentage)                                        // 50% of 40 = 20
-		_, err = applySlashing(snapshot, current, state, reporter, doubleSignEpoch, slashTrack, slashDebt, delegationSnapshot)
+		totalDelegationDec := numeric.NewDecFromBigInt(totalExternalDelegation)
+		percentage := numeric.NewDecFromBigInt(delegationSnapshot.Amount).Quo(totalDelegationDec)
+		slashDebt := applySlashRate(totalDebt, percentage)
+		_, err = applySlashingToDelegator(snapshot, current, state, reporter, doubleSignEpoch, slashTrack, slashDebt, delegationSnapshot)
 		if err != nil {
 			return err
 		}
@@ -396,7 +397,9 @@ func delegatorSlashApply(
 	return nil
 }
 
-func applySlashing(snapshot, current *staking.ValidatorWrapper, state *state.DB, reporter common.Address, doubleSignEpoch *big.Int, slashTrack *Application, slashDebt *big.Int, delegationSnapshot staking.Delegation) (*big.Int, error) {
+// applySlashingToDelegator applies slashing to a delegator, given the amount that should be slashed.
+// Also, rewards the snitch half of the amount that was successfully slashed.
+func applySlashingToDelegator(snapshot, current *staking.ValidatorWrapper, state *state.DB, reporter common.Address, doubleSignEpoch *big.Int, slashTrack *Application, slashDebt *big.Int, delegationSnapshot staking.Delegation) (*big.Int, error) {
 	snapshotAddr := delegationSnapshot.DelegatorAddress
 	slashDiff := &Application{big.NewInt(0), big.NewInt(0)}
 	for i := range current.Delegations {
@@ -521,9 +524,8 @@ func Apply(
 				errValidatorNotFoundDuringSlash, " %s ", err.Error(),
 			)
 		}
-		// NOTE invariant: first delegation is the validators own
-		// stake, rest are external delegations.
-		// Bottom line: everyone will be slashed under the same rule.
+		// NOTE invariant: first delegation is the validators own stake,
+		// rest are external delegations.
 		if err := delegatorSlashApply(
 			snapshot.Validator, current, state,
 			slash.Reporter, slash.Evidence.Epoch, slashDiff,

@@ -691,7 +691,7 @@ func (tc *applySlashingTestCase) makeData() {
 }
 
 func (tc *applySlashingTestCase) apply() {
-	_, tc.gotErr = applySlashing(tc.snapshot, tc.current, tc.state, tc.reporter,
+	_, tc.gotErr = applySlashingToDelegator(tc.snapshot, tc.current, tc.state, tc.reporter,
 		big.NewInt(doubleSignEpoch), tc.slashTrack, new(big.Int).Set(tc.debt), tc.snapshot.Delegations[tc.delegationIdx])
 }
 
@@ -760,6 +760,13 @@ func (tc *slashApplyTestCase) checkResult() error {
 type expDelegation struct {
 	expAmt, expReward *big.Int
 	expUndelAmt       []*big.Int
+}
+
+type testDelegation struct {
+	address        string
+	amount         *big.Int
+	historyUndel   *big.Int
+	afterSignUndel *big.Int
 }
 
 func (ed expDelegation) checkDelegation(d staking.Delegation) error {
@@ -1034,13 +1041,6 @@ func generateDelegations(delData []testDelegation) staking.Delegations {
 	}
 
 	return delegations
-}
-
-type testDelegation struct {
-	address        string
-	amount         *big.Int
-	historyUndel   *big.Int
-	afterSignUndel *big.Int
 }
 
 func defaultTestDelegations() staking.Delegations {
