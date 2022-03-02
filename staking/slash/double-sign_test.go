@@ -374,8 +374,8 @@ func TestPayDownAsMuchAsCan(t *testing.T) {
 	}
 }
 
-func TestApplySlashing(t *testing.T) {
-	tests := []applySlashingTestCase{
+func TestApplySlashingToDelegator(t *testing.T) {
+	tests := []applySlashingToDelegatorTestCase{
 		{
 			snapshot:      defaultSnapValidatorWrapper(),
 			current:       defaultCurrentValidatorWrapper(),
@@ -653,7 +653,7 @@ func TestDelegatorSlashApply(t *testing.T) {
 	}
 }
 
-type applySlashingTestCase struct {
+type applySlashingToDelegatorTestCase struct {
 	snapshot, current *staking.ValidatorWrapper
 	state             *state.DB
 	reporter          common.Address
@@ -681,7 +681,7 @@ type slashApplyTestCase struct {
 	expErr                error
 }
 
-func (tc *applySlashingTestCase) makeData() {
+func (tc *applySlashingToDelegatorTestCase) makeData() {
 	tc.reporter = reporterAddr
 	tc.state = makeTestStateDB()
 	tc.slashTrack = &Application{
@@ -690,12 +690,12 @@ func (tc *applySlashingTestCase) makeData() {
 	}
 }
 
-func (tc *applySlashingTestCase) apply() {
+func (tc *applySlashingToDelegatorTestCase) apply() {
 	_, tc.gotErr = applySlashingToDelegator(tc.snapshot, tc.current, tc.state, tc.reporter,
 		big.NewInt(doubleSignEpoch), tc.slashTrack, new(big.Int).Set(tc.debt), tc.snapshot.Delegations[tc.delegationIdx])
 }
 
-func (tc *applySlashingTestCase) checkResult() error {
+func (tc *applySlashingToDelegatorTestCase) checkResult() error {
 	if err := assertError(tc.gotErr, tc.expErr); err != nil {
 		return err
 	}
