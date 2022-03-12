@@ -332,7 +332,7 @@ func (e *engineImpl) Finalize(
 
 	// Apply slashes
 	if isBeaconChain && inStakingEra && len(doubleSigners) > 0 {
-		if err := applySlashes(chain, header, state, doubleSigners); err != nil {
+		if err := applySlashes(chain, state, doubleSigners); err != nil {
 			return nil, nil, err
 		}
 	} else if len(doubleSigners) > 0 {
@@ -435,7 +435,6 @@ func setElectionEpochAndMinFee(header *block.Header, state *state.DB, config *pa
 
 func applySlashes(
 	chain engine.ChainReader,
-	header *block.Header,
 	state *state.DB,
 	doubleSigners slash.Records,
 ) error {
